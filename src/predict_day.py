@@ -1,4 +1,4 @@
-from sklearn_model_beta2 import getWeekNum, getYearBin, convertToOneHot, selectFeature, mergeList, splitData
+from day_sklearn_model_beta3 import getWeekNum, getYearBin, convertToOneHot, selectFeature, mergeList, splitData
 from sklearn.externals import joblib
 from datetime import datetime
 import numpy as np
@@ -40,14 +40,14 @@ testData = pd.read_csv(testFileName, header=0)
 inputArray = testDeal(testData)
 #   load model from train result
 regModel = joblib.load("./model/reg_591_0.9350.926.m")
-cntModel = joblib.load("./model/cnt_591_0.9350.926.m")
+casModel = joblib.load("./model/cas_591_0.9360.901.m")
 #   output test predict
 pre_reg_test = regModel.predict(inputArray)
-pre_cnt_test = cntModel.predict(inputArray)
+pre_cas_test = casModel.predict(inputArray)
 
 testData.loc[:, 'registered'] = pre_reg_test
-testData.loc[:, 'cnt'] = pre_cnt_test
-testData.loc[:, 'casual'] = testData['cnt'] - testData['registered']
+testData.loc[:, 'casual'] = pre_cas_test
+testData.loc[:, 'cnt'] = testData['casual'] + testData['registered']
 
 #   output the predict result and the origin validation target
 outputName = "./output/output_"+str(datetime.now())[:19].replace(' ', '_').replace(':', '_') + ".xls"

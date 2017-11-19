@@ -1,6 +1,7 @@
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.utils import shuffle
 from sklearn.metrics import mean_squared_error
+from sklearn.externals import joblib
 import pandas as pd
 import numpy as np
 import re
@@ -119,10 +120,10 @@ def splitData(data, seed):
     column = list(data)
     trainSet = pd.DataFrame(columns = selectFeature)
     trainTarget_reg = pd.DataFrame(columns = [column[14]])
-    trainTarget_cnt = pd.DataFrame(columns = [column[15]])
+    trainTarget_cas = pd.DataFrame(columns = [column[13]])
     validSet = pd.DataFrame(columns = selectFeature)
     validTarget_reg = pd.DataFrame(columns = [column[14]])
-    validTarget_cnt = pd.DataFrame(columns = [column[15]])
+    validTarget_cas = pd.DataFrame(columns = [column[13]])
     #   split the data in different month
     for i in range(1,13):
         temp = data.loc[data.mnth == i]
@@ -131,10 +132,10 @@ def splitData(data, seed):
         V_num = len(temp) - T_num
         trainSet = trainSet.append(temp.head(T_num).ix[:, [*selectFeature]])
         trainTarget_reg = trainTarget_reg.append(temp.head(T_num).ix[:, [14]])
-        trainTarget_cnt = trainTarget_cnt.append(temp.head(T_num).ix[:, [15]])
+        trainTarget_cas = trainTarget_cas.append(temp.head(T_num).ix[:, [13]])
         validSet = validSet.append(temp.tail(V_num).ix[:, [*selectFeature]])
         validTarget_reg = validTarget_reg.append(temp.tail(V_num).ix[:, [14]])
-        validTarget_cnt = validTarget_cnt.append(temp.tail(V_num).ix[:, [15]])
+        validTarget_cas = validTarget_cas.append(temp.tail(V_num).ix[:, [13]])
 
     #   apply oneHot
     trainSet = convertToOneHot(trainSet)
@@ -156,10 +157,10 @@ def splitData(data, seed):
     return (
         np.array(trainSet),
         trainTarget_reg.values.ravel(),
-        trainTarget_cnt.values.ravel(),
+        trainTarget_cas.values.ravel(),
         np.array(validSet),
         validTarget_reg.values.ravel(),
-        validTarget_cnt.values.ravel()
+        validTarget_cas.values.ravel()
     )
 
 def trainDeal(data, seed):
@@ -177,11 +178,11 @@ def trainDeal(data, seed):
     data.loc[((data.workingday == 1) & (data.holiday == 0)), 'datetype'] = 1
     data.loc[(data.holiday == 1), 'datetype'] = 2
 
-    (trainSet, regTrainTarget, cntTrainTarget,
-     validSet, regValidTarget, cntValidTarget) = splitData(data, seed)
+    (trainSet, regTrainTarget, casTrainTarget,
+     validSet, regValidTarget, casValidTarget) = splitData(data, seed)
 
-    return (trainSet, regTrainTarget, cntTrainTarget,
-            validSet, regValidTarget, cntValidTarget)
+    return (trainSet, regTrainTarget, casTrainTarget,
+            validSet, regValidTarget, casValidTarget)
 
 
 '''
@@ -190,26 +191,32 @@ def trainDeal(data, seed):
 #   follow code will not run when you import it as a module
 if __name__ == '__main__':
     #   split the train data
-    (trainSet, regTrainTarget, cntTrainTarget,
-    validSet, regValidTarget, cntValidTarget) = trainDeal(inputData, 591)
+    (trainSet, regTrainTarget, casTrainTarget,
+    validSet, regValidTarget, casValidTarget) = trainDeal(inputData, 591)
     #   define the model and fit 
     regModel = GradientBoostingRegressor(n_estimators=120, learning_rate=0.15)
-    cntModel = GradientBoostingRegressor(n_estimators=120, learning_rate=0.15)
+    casModel = GradientBoostingRegressor()
     regModel.fit(trainSet, regTrainTarget)
-    cntModel.fit(trainSet, cntTrainTarget)
+    casModel.fit(trainSet, casTrainTarget)
 
     print('OK\n')
 
-    print(regModel.score(validSet, regValidTarget))
+    r1 = regModel.score(validSet, regValidTarget)
+    print(r1)
     reg_pre_valid = regModel.predict(validSet)
     reg_pre_train = regModel.predict(trainSet)
     print("MSE in train for reg: "+str(mean_squared_error(regTrainTarget, reg_pre_train)))
     print("MSE in valid for reg: "+str(mean_squared_error(regValidTarget, reg_pre_valid)))
     print('\n')
 
-    print(cntModel.score(validSet, cntValidTarget))
-    cnt_pre_valid = cntModel.predict(validSet)
-    cnt_pre_train = cntModel.predict(trainSet)
-    print("MSE in train for cnt: "+str(mean_squared_error(cntTrainTarget, cnt_pre_train)))
-    print("MSE in valid for cnt: "+str(mean_squared_error(cntValidTarget, cnt_pre_valid)))
+    r2 = casModel.score(validSet, casValidTarget)
+    print(r2)
+    cas_pre_valid = casModel.predict(validSet)
+    cas_pre_train = casModel.predict(trainSet)
+    print("MSE in train for cas: "+str(mean_squared_error(casTrainTarget, cas_pre_train)))
+    print("MSE in valid for cas: "+str(mean_squared_error(casValidTarget, cas_pre_valid)))
     print('\n')
+
+    #   save the  casual model
+    name2 = 'C:\\Users\\yqr20\\大数据分析比赛\\Bicycle-sharing-analyze\\src\\model\\cas_' + str(591) + '_' +str(r1)[0:5] + str(r2)[0:5] + '.m'
+    joblib.dump(casModel, name2)
