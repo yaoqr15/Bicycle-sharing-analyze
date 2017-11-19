@@ -10,13 +10,11 @@ import re
 '''
 #   import data from csv file
 trainFileName = '../day/train_day.csv'
-testFileName = '../day/test_day.csv'
 inputData = pd.read_csv(trainFileName, header=0)
-testData = pd.read_csv(testFileName, header=0)
 #   selected feature for the model input
-selectFeature = ['dteday', 'yr','yearbin',
+selectFeature = [ 'mnth', 'yr','yearbin',
                  'weekday', 'datetype', 'weathersit', 
-                 'temp', 'hum', 'windspeed']
+                 'dteday', 'atemp', 'hum', 'windspeed']
 
 #   one-hot for the label
 def oneHot(maxNum, num):
@@ -67,18 +65,6 @@ def getYearBin(data):
 
 #   apply to the feature that you want to convert
 def convertToOneHot(data):
-    '''data['season'] = list(
-        map(
-            lambda x: oneHot(4, int(x-1)),
-            data['season']
-        )
-    )
-    data['mnth'] = list(
-        map(
-            lambda x: oneHot(12, int(x-1)),
-            data['mnth']
-        )
-    )'''
     data['yearbin'] = list(
         map(
             lambda x: oneHot(8, int(x-1)),
@@ -95,6 +81,12 @@ def convertToOneHot(data):
         map(
             lambda x: oneHot(3, int(x)),
             data['datetype']
+        )
+    )
+    data['mnth'] = list(
+        map(
+            lambda x: oneHot(12, int(x-1)),
+            data['mnth']
         )
     )
     data['weekday'] = list(
@@ -122,7 +114,7 @@ def mergeList(inputList):
     return tmp
 
 #   shuffle data; get the array; split data into different set
-def splitData(data):
+def splitData(data, seed):
     #   create the empty set
     column = list(data)
     trainSet = pd.DataFrame(columns = selectFeature)
@@ -134,10 +126,9 @@ def splitData(data):
     #   split the data in different month
     for i in range(1,13):
         temp = data.loc[data.mnth == i]
-        temp = shuffle(temp)
+        temp = shuffle(temp, random_state=seed)
         T_num = round(0.8*len(temp))
         V_num = len(temp) - T_num
-        print(T_num, V_num)
         trainSet = trainSet.append(temp.head(T_num).ix[:, [*selectFeature]])
         trainTarget_reg = trainTarget_reg.append(temp.head(T_num).ix[:, [14]])
         trainTarget_cnt = trainTarget_cnt.append(temp.head(T_num).ix[:, [15]])
@@ -148,7 +139,6 @@ def splitData(data):
     #   apply oneHot
     trainSet = convertToOneHot(trainSet)
     validSet = convertToOneHot(validSet)
-
     #   generate the proper array
     trainSet = list(
         map(
@@ -172,7 +162,7 @@ def splitData(data):
         validTarget_cnt.values.ravel()
     )
 
-def trainDeal(data):
+def trainDeal(data, seed):
     #   convert the dteday to weekNumber
     data['dteday'] = list(
         map(
@@ -182,104 +172,44 @@ def trainDeal(data):
     )
     #   get year bins
     getYearBin(data)
-    
     #   get the new feature -- datetype
     data.loc[((data.workingday == 0) & (data.holiday == 0)), 'datetype'] = 0
     data.loc[((data.workingday == 1) & (data.holiday == 0)), 'datetype'] = 1
     data.loc[(data.holiday == 1), 'datetype'] = 2
 
     (trainSet, regTrainTarget, cntTrainTarget,
-     validSet, regValidTarget, cntValidTarget) = splitData(data)
-
+     validSet, regValidTarget, cntValidTarget) = splitData(data, seed)
 
     return (trainSet, regTrainTarget, cntTrainTarget,
             validSet, regValidTarget, cntValidTarget)
 
-def testDeal(data):
-    data = data.copy()
-    data['dteday'] = list(
-        map(
-            lambda x: getWeekNum(x),
-            data['dteday']
-        )
-    )
-    #   get the new feature -- datetype
-    data.loc[((data.workingday == 0) & (data.holiday == 0)), 'datetype'] = 0
-    data.loc[((data.workingday == 1) & (data.holiday == 0)), 'datetype'] = 1
-    data.loc[(data.holiday == 1), 'datetype'] = 2
 
-    #   split data by year
-    dataSet_2011 = data[data.yr == 0].copy()
-    dataSet_2012 = data[data.yr == 1].copy()
-    #   apply oneHot, and select feature
-    dataSet_2011 = convertToOneHot(dataSet_2011)
-    dataSet_2011 = dataSet_2011.loc[:, [*selectFeature]]
-    dataSet_2012 = convertToOneHot(dataSet_2012)
-    dataSet_2012 = dataSet_2012.loc[:, [*selectFeature]]
-    #   generate the proper array
-    dataSet_2011 = list(
-        map(
-            lambda x: mergeList(x),
-            dataSet_2011.values.tolist()
-        )
-    )
-    dataSet_2012 = list(
-        map(
-            lambda x: mergeList(x),
-            dataSet_2012.values.tolist()
-        )
-    )
-    #   return the four data set
-    return (np.array(dataSet_2011), np.array(dataSet_2012))
-
-#   split the train data
-(trainSet, regTrainTarget, cntTrainTarget,
- validSet, regValidTarget, cntValidTarget) = trainDeal(inputData)
-
-#   define the model; fit the model; score of the model
-regModel = GradientBoostingRegressor(n_estimators=200)
-cntModel = GradientBoostingRegressor(n_estimators=200)
-
-regModel.fit(trainSet, regTrainTarget)
-cntModel.fit(trainSet, cntTrainTarget)
-
-
-print('OK\n')
-
-print(regModel.score(validSet, regValidTarget))
-reg_pre_valid = regModel.predict(validSet)
-reg_pre_train = regModel.predict(trainSet)
-print("MSE in train for reg: "+str(mean_squared_error(regTrainTarget, reg_pre_train)))
-print("MSE in valid for reg: "+str(mean_squared_error(regValidTarget, reg_pre_valid)))
-print('\n')
-
-print(cntModel.score(validSet, cntValidTarget))
-cnt_pre_valid = cntModel.predict(validSet)
-cnt_pre_train = cntModel.predict(trainSet)
-print("MSE in train for cnt: "+str(mean_squared_error(cntTrainTarget, cnt_pre_train)))
-print("MSE in valid for cnt: "+str(mean_squared_error(cntValidTarget, cnt_pre_valid)))
-print('\n')
-
-'''#   get the test data
-testData_2011, testData_2012 = testDeal(testData)
-#   output test predict
-pre_reg_test_2011 = regModel_2011.predict(testData_2011)
-pre_cnt_test_2011 = cntModel_2011.predict(testData_2011)
-pre_reg_test_2012 = regModel_2012.predict(testData_2012)
-pre_cnt_test_2012 = cntModel_2012.predict(testData_2012)'''
-
-#print(cntTrainTarget)
 '''
-testData.loc[(testData.yr == 0), 'registered'] = pre_reg_test_2011
-testData.loc[(testData.yr == 0), 'cnt'] = pre_cnt_test_2011
-testData.loc[(testData.yr == 1), 'registered'] = pre_reg_test_2012
-testData.loc[(testData.yr == 1), 'cnt'] = pre_cnt_test_2012
-testData.loc[:, 'casual'] = testData['cnt'] - testData['registered']
-print(testData.head(20))
+    the code that define the model and fit the model
+'''
+#   follow code will not run when you import it as a module
+if __name__ == '__main__':
+    #   split the train data
+    (trainSet, regTrainTarget, cntTrainTarget,
+    validSet, regValidTarget, cntValidTarget) = trainDeal(inputData, 591)
+    #   define the model and fit 
+    regModel = GradientBoostingRegressor(n_estimators=120, learning_rate=0.15)
+    cntModel = GradientBoostingRegressor(n_estimators=120, learning_rate=0.15)
+    regModel.fit(trainSet, regTrainTarget)
+    cntModel.fit(trainSet, cntTrainTarget)
 
-#   output the predict result and the origin validation target
-pd.DataFrame(model.predict(validSet)).to_excel('pre_valid.xls')
-pd.DataFrame(validTarget).to_excel('valid.xls')
+    print('OK\n')
 
-print(trainSet_2012[0:10])
-print(trainTarget_2012[0:10])'''
+    print(regModel.score(validSet, regValidTarget))
+    reg_pre_valid = regModel.predict(validSet)
+    reg_pre_train = regModel.predict(trainSet)
+    print("MSE in train for reg: "+str(mean_squared_error(regTrainTarget, reg_pre_train)))
+    print("MSE in valid for reg: "+str(mean_squared_error(regValidTarget, reg_pre_valid)))
+    print('\n')
+
+    print(cntModel.score(validSet, cntValidTarget))
+    cnt_pre_valid = cntModel.predict(validSet)
+    cnt_pre_train = cntModel.predict(trainSet)
+    print("MSE in train for cnt: "+str(mean_squared_error(cntTrainTarget, cnt_pre_train)))
+    print("MSE in valid for cnt: "+str(mean_squared_error(cntValidTarget, cnt_pre_valid)))
+    print('\n')
