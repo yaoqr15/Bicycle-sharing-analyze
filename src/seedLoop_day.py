@@ -1,5 +1,5 @@
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn_model_beta3 import trainDeal
+from day_sklearn_model_final import trainDeal
 from sklearn.externals import joblib
 import pandas as pd
 import numpy as np

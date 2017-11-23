@@ -1,4 +1,4 @@
-from day_sklearn_model_beta3 import getWeekNum, getYearBin, convertToOneHot, selectFeature, mergeList, splitData
+from day_sklearn_model_final import getWeekNum, getYearBin, convertToOneHot, selectFeature, mergeList, splitData
 from sklearn.externals import joblib
 from datetime import datetime
 import numpy as np
